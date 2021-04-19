@@ -35,6 +35,8 @@
 #include "V4l2RTSPServer.h"
 
 
+
+
 // -----------------------------------------
 //    signal handler
 // -----------------------------------------
@@ -156,6 +158,7 @@ int main(int argc, char** argv)
 	int audioNbChannels = 2;
 	std::list<snd_pcm_format_t> audioFmtList;
 	snd_pcm_format_t audioFmt = SND_PCM_FORMAT_UNKNOWN;
+	int compressedAudioFmt = COMPRESSED_AUDIO_FMT_NONE;
 #endif	
 	const char* defaultPort = getenv("PORT");
 	if (defaultPort != NULL) {
@@ -164,7 +167,7 @@ int main(int argc, char** argv)
 
 	// decode parameters
 	int c = 0;     
-	while ((c = getopt (argc, argv, "v::Q:O:b:" "I:P:p:m::u:M:ct:S::" "R:U:" "rwBsf::F:W:H:G:" "A:C:a:" "Vh")) != -1)
+	while ((c = getopt (argc, argv, "v::Q:O:b:" "I:P:p:m::u:M:ct:S::" "R:U:" "rwBsf::F:W:H:G:" "A:C:a:l:" "Vh")) != -1)
 	{
 		switch (c)
 		{
@@ -204,6 +207,10 @@ int main(int argc, char** argv)
 			case 'A':	audioFreq = atoi(optarg); break;
 			case 'C':	audioNbChannels = atoi(optarg); break;
 			case 'a':	audioFmt = decodeAudioFormat(optarg); if (audioFmt != SND_PCM_FORMAT_UNKNOWN) {audioFmtList.push_back(audioFmt);} ; break;
+
+			case 'l':	compressedAudioFmt = atoi(optarg); break;
+
+
 #endif			
 			
 			// version
@@ -255,6 +262,8 @@ int main(int argc, char** argv)
 				std::cout << "\t -A freq          : ALSA capture frequency and channel (default " << audioFreq << ")"                                << std::endl;
 				std::cout << "\t -C channels      : ALSA capture channels (default " << audioNbChannels << ")"                                       << std::endl;
 				std::cout << "\t -a fmt           : ALSA capture audio format (default S16_BE)"                                                      << std::endl;
+				std::cout << "\t -l [number]      : Compresssed audio format: 0 - None, 1 - MP3"                                                                 << std::endl;
+
 #endif
 				
 				std::cout << "\t Devices :"                                                                                                    << std::endl;
@@ -342,9 +351,41 @@ int main(int argc, char** argv)
 			// Init Audio Capture
 			StreamReplicator* audioReplicator = NULL;
 #ifdef HAVE_ALSA
+
 			audioReplicator = rtspServer.CreateAudioReplicator(
 					audioDev, audioFmtList, audioFreq, audioNbChannels, verbose,
-					queueSize, useThread);		
+					queueSize, useThread /* compressor */);		
+			// if (!audioDev.empty())
+			// {
+			// 	// find the ALSA device associated with the V4L2 device
+			// 	audioDev = getV4l2Alsa(audioDev);
+			
+			// 	// Init audio capture
+			// 	LOG(NOTICE) << "Create ALSA Source..." << audioDev;
+				
+			// 	ALSACaptureParameters param(audioDev.c_str(), audioFmtList, audioFreq, audioNbChannels, verbose, compressedAudioFmt);
+			// 	ALSACapture* audioCapture = ALSACapture::createNew(param);
+			// 	if (audioCapture) 
+			// 	{
+			// 		rtpAudioFormat.assign(
+			// 			V4l2RTSPServer::getAudioRtpFormat(
+			// 				audioCapture->getFormat(),audioCapture->getSampleRate(), audioCapture->getChannels()
+			// 			)
+			// 		);
+
+			// 		if (compressedAudioFmt == COMPRESSED_AUDIO_FMT_MP3) {
+			// 			rtpAudioFormat.assign("audio/MPEG");
+			// 		}
+
+
+			// 		audioReplicator = DeviceSourceFactory::createStreamReplicator(rtspServer.env(), 0, new DeviceCaptureAccess<ALSACapture>(audioCapture), queueSize, useThread);
+			// 		if (audioReplicator == NULL) 
+			// 		{
+			// 			LOG(FATAL) << "Unable to create source for device " << audioDev;
+			// 			delete audioCapture;
+			// 		}
+			// 	}
+			// }		
 #endif
 					
 										
@@ -362,6 +403,7 @@ int main(int argc, char** argv)
 			
 			// Create Unicast Session
 			nbSource += rtspServer.AddUnicastSession(baseUrl+url, videoReplicator, audioReplicator);		
+			
 		}
 
 		if (nbSource>0)
